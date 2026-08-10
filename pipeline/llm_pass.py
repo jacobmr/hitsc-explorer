@@ -95,7 +95,9 @@ def _ask(client, prompt, max_tokens=2000):
         model=MODEL, max_tokens=max_tokens,
         messages=[{"role": "user", "content": prompt}],
     )
-    return resp.content[0].text
+    # Not resp.content[0]: current models may put a ThinkingBlock first, which
+    # has no .text. Join every text block instead of assuming the shape.
+    return "\n".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
 
 
 def summarize_meetings(con, client, limit=None):

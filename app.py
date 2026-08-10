@@ -14,7 +14,35 @@ import streamlit as st
 
 DB = Path(__file__).parent / "hitsc.db"
 
+# The database ships as a release asset rather than a tracked file: it is ~25MB
+# of binary that changes wholesale on every rebuild, and committing each new
+# copy grows the repository permanently. Build it locally with
+# `python -m pipeline.build_db`, or let this fetch the published one.
+DB_URL = ("https://github.com/jacobmr/hitsc-explorer/releases/download/"
+          "db-v1/hitsc.db")
+DB_MIN_BYTES = 1_000_000        # anything smaller is a truncated download
+
 st.set_page_config(page_title="HITSC Transcript Explorer", layout="wide")
+
+
+@st.cache_resource
+def ensure_db():
+    """Return the local database path, downloading it once if absent."""
+    if DB.exists() and DB.stat().st_size >= DB_MIN_BYTES:
+        return DB
+    import requests
+    tmp = DB.with_suffix(".db.part")
+    with st.spinner("Fetching the transcript database (~25MB, first run only)…"):
+        with requests.get(DB_URL, stream=True, timeout=300) as r:
+            r.raise_for_status()
+            with open(tmp, "wb") as f:
+                for chunk in r.iter_content(1 << 20):
+                    f.write(chunk)
+    if tmp.stat().st_size < DB_MIN_BYTES:
+        tmp.unlink(missing_ok=True)
+        raise RuntimeError(f"Downloaded database looks truncated: {DB_URL}")
+    tmp.replace(DB)             # atomic: never leave a half-file at DB
+    return DB
 
 TOPIC_LABELS = {
     "nhin": "NHIN / NwHIN",
@@ -54,7 +82,7 @@ GENERIC_ORG_WORDS = {
 
 @st.cache_resource
 def get_con():
-    return sqlite3.connect(DB, check_same_thread=False)
+    return sqlite3.connect(ensure_db(), check_same_thread=False)
 
 
 @st.cache_data
@@ -188,13 +216,17 @@ def page_overview():
     }
     metric = c1.radio("Rank by", list(METRICS), horizontal=True, key="ov_metric")
     incl_staff = c2.toggle("Include ONC/CMS staff", value=False, key="ov_staff")
+    # The cutoff is a real editorial choice — the tail past ~20 is where
+    # occasional members and one-off presenters start, so make it the reader's
+    # to make rather than baking in a number.
+    n_top = c2.slider("Show top", 10, 50, 25, step=5, key="ov_n")
     col, expr = METRICS[metric]
     where = "WHERE s.name != '(unidentified)'" + (
         "" if incl_staff else f" AND s.{staff_col()}=0")
     top = q(f"""
         SELECT s.name || ' — ' || s.org AS speaker, ROUND({expr}) {col}
         FROM utterances u JOIN speakers s ON s.id=u.speaker_id
-        {where} GROUP BY s.id ORDER BY {col} DESC LIMIT 20""")
+        {where} GROUP BY s.id ORDER BY {col} DESC LIMIT {int(n_top)}""")
     st.altair_chart(bar(top, col, "speaker"), width="stretch")
     st.caption(
         "**Word counts favour long presentations and whoever chairs the meeting.** "

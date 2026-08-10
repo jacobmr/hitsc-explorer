@@ -6,3 +6,8 @@ corpus_text/
 corpus_text_cache/
 .claude/
 .DS_Store
+
+# The database ships as a release asset (see DB_URL in app.py), not in git:
+# it is ~25MB of binary that changes wholesale on every rebuild.
+hitsc.db
+hitsc.db.part

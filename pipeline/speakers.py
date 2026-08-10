@@ -149,6 +149,19 @@ ORG_RULES = [
     (re.compile(r"national quality|\bnqf\b", re.I), "National Quality Forum"),
 ]
 
+# People with a government affiliation who nonetheless served as committee
+# leadership, and so are members for the purposes of the staff filter.
+#
+# is_gov_staff is inferred from organization alone, which cannot see the
+# difference between an ONC official who briefed the committee and one who
+# co-chaired it. Without this exemption a co-chair is hidden from the default
+# speaker leaderboard entirely, at any list length.
+#
+# Jacob Reider (ONC) co-chaired with John Halamka from roughly March to
+# November 2014 — per Reider directly; the transcripts record his ONC titles,
+# not the co-chair role, so it is not otherwise recoverable from the corpus.
+COMMITTEE_LEADERSHIP = {"jacob reider"}
+
 TITLE_WORDS = {
     "director", "officer", "president", "vp", "vice", "chief", "chair",
     "chairman", "dean", "advisor", "adviser", "founder", "ceo", "cio", "cmio",
@@ -278,6 +291,7 @@ class SpeakerRegistry:
             known = {canon for _rx, canon in ORG_RULES}
             org = max(rec["orgs"].items(),
                       key=lambda kv: (kv[0] in known, kv[1]))[0] if rec["orgs"] else ""
-            is_staff = org in ("ONC", "HHS", "CMS", "Altarum")
+            is_staff = (org in ("ONC", "HHS", "CMS", "Altarum")
+                        and key not in COMMITTEE_LEADERSHIP)
             out[key] = (display, org, is_staff)
         return out

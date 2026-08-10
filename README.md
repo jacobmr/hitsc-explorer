@@ -10,7 +10,7 @@ It is a fork of [healthbjk/hitpc-explorer](https://github.com/healthbjk/hitpc-ex
 
 ## What's inside
 
-- **`hitsc.db`** — SQLite database: 68 meetings, 21,399 speaker-attributed utterances (2.28M words), 263 normalized speakers, keyword topic tags, and full-text search (FTS5).
+- **`hitsc.db`** — SQLite database (a [release asset](https://github.com/jacobmr/hitsc-explorer/releases/tag/db-v1), fetched on first run, not tracked in git): 68 meetings, 21,399 speaker-attributed utterances (2.28M words), 263 normalized speakers, keyword topic tags, and full-text search (FTS5).
 - **`app.py`** — Streamlit app: **Speakers** (leaderboard → per-person record: activity vs the committee average, topic mix, position analysis, every quote, and how others referred to them), **Topics** (trend charts), **Search** (full-text), and **Meetings & Transcripts** (full transcript of any meeting, downloadable, with a link back to the original ONC source).
 - **`pipeline/`** — the full reproducible pipeline: Wayback CDX discovery (`collect_hitsc_corpus.py`), text extraction, transcript parsing (three transcription-vendor grammars), speaker normalization, and topic tagging.
 
@@ -21,7 +21,13 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/streamlit run app.py
 ```
 
-The app runs entirely off the committed `hitsc.db` — no other data needed.
+The database is not in the repository — it is published as a [release asset](https://github.com/jacobmr/hitsc-explorer/releases/tag/db-v1) and downloaded automatically on first run (~25MB, once). A ~25MB binary that changes wholesale on every rebuild would grow the repository permanently if committed.
+
+To publish a rebuilt database:
+
+```bash
+gh release upload db-v1 hitsc.db --clobber --repo jacobmr/hitsc-explorer
+```
 
 ## Rebuild from scratch (optional)
 
@@ -74,3 +80,4 @@ The filter is applied to the **basename only**. Many of these files live under p
 - Topic families are tuned to this committee's subject matter — vocabularies, content standards, FHIR/APIs, transport, testing and certification, standards process, maturity — rather than the policy questions HITPC handled. The `vendor_mention` family is built from companies actually named in these transcripts, in descending order of how often they appear: Surescripts (62), Cerner (56), Google (36), Microsoft (27), athenahealth (20), Epic (16). The Policy Committee corpus gives Epic a topic family of its own; that would be a poor fit here.
 - Three transcription-vendor grammars appear across the corpus (em-dash headers, comma headers, and bare-name headers); the parser detects which is in use per file.
 - One 2011 document is a `.doc` the extractor skips; the same meeting is present as a PDF.
+- The `is_gov_staff` flag — which drives the leaderboard's "Include ONC/CMS staff" toggle — is inferred from a speaker's organization, so it cannot by itself distinguish an ONC official who briefed the committee from one who led it. `COMMITTEE_LEADERSHIP` in `pipeline/speakers.py` carries the exceptions. Jacob Reider (ONC) co-chaired with John Halamka from roughly March to November 2014; the transcripts record his ONC titles, not the co-chair role, so it is not recoverable from the corpus itself.

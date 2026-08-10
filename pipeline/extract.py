@@ -9,7 +9,7 @@ import zipfile
 from datetime import date
 from pathlib import Path
 
-CORPUS_DIR = Path(__file__).resolve().parent.parent / "hitpc_corpus"
+CORPUS_DIR = Path(__file__).resolve().parent.parent / "hitsc_corpus"
 TEXT_DIR = Path(__file__).resolve().parent.parent / "corpus_text"
 
 SKIP_FILES = {"manifest.csv", "candidates.csv", "run.log", "run2.log", "run3.log"}

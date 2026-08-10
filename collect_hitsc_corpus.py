@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-collect_hitpc_corpus.py
+collect_hitsc_corpus.py
 -----------------------
-Downloads full HIT Policy Committee (HITPC) meeting transcripts from the
+Downloads full HIT Standards Committee (HITSC) meeting transcripts from the
 Internet Archive Wayback Machine.
 
 WHY THIS SCRIPT EXISTS
@@ -19,13 +19,36 @@ REQUIREMENTS
 
 WHAT IT DOES
   1. Sweeps the Wayback CDX index for both ONC domains.
-  2. Keeps only textual transcripts of full HITPC committee meetings -- not
-     the HIT Standards Committee (a sibling body), and not workgroup/
-     subcommittee/Tiger-Team sessions (Meaningful Use, Privacy & Security,
-     NHIN, Certification/Adoption, etc.), which have their own transcript
-     files with a workgroup code between "policy" and "transcript".
+  2. Keeps only textual transcripts of full HITSC committee meetings -- not
+     the HIT Policy Committee (a sibling body), and not workgroup/
+     subcommittee/task-force sessions, which ONC named two different ways
+     across the committee's life (see FILENAME ERAS below).
   3. Downloads the raw archived file (id_ modifier = original bytes, no IA chrome).
   4. Writes manifest.csv logging every file, its original URL, and capture date.
+
+FILENAME ERAS
+  ONC renamed these files four times in six years. The full-committee
+  transcripts look like:
+
+    2009        HITstandards_transcript_062309-1.pdf     (MMDDYY, no separators)
+                standards_transcript.pdf                 (no date at all)
+    2010-2012   2010-02-24_standards_transcript_draft.pdf
+                2010-03-24_standards_final_transcript.pdf
+                2010-05-26-standards-transcript.pdf      (hyphens)
+                20100120_standards_transcript_draft.pdf  (YYYYMMDD)
+                2010_10_27_standards_transcript_draft.pdf
+    2011-2013   2011-11-16_HITSC_Final_Transcript.pdf    ("standards" -> "hitsc")
+                2012-10-17_hitsc_transcript.pdf
+    2014-2015   HITSC_Transcript_Final_2014-02-18.pdf    (date moved to the end)
+
+  Workgroup transcripts sit a code between "standards"/"hitsc" and
+  "transcript" -- ps (privacy & security), si (standards & interoperability),
+  co (certification & adoption), cq (clinical quality), ct (certification
+  testing), vtf (vocabulary task force), nwhin, cpe, pghd, and combinations
+  ("co_vtf", "ps_nwhin"). In the 2014-2015 era ONC dropped the shared prefix
+  and gave each workgroup its own acronym instead (ASA_, CSWG_, ICTWG_,
+  ISATF_, APISWG_, CQWG_, DPROVTF_), so those never match on "standards" or
+  "hitsc" at all.
 
 TUNING
   - --start / --end (YYYY-MM-DD) restrict to meeting dates parsed out of each
@@ -38,33 +61,35 @@ import argparse, csv, os, re, sys, time, json
 from datetime import date
 import requests
 
-OUTDIR = "hitpc_corpus"
+OUTDIR = "hitsc_corpus"
 SLEEP = 0.5                          # be polite to archive.org
 CDX = "http://web.archive.org/cdx/search/cdx"
 DRY_RUN = False                       # True: only write candidates.csv, no downloads
 
 DOMAINS = ["healthit.hhs.gov", "healthit.gov"]
 
-# Matches "policy_transcript", "policy_committee_transcript_draft",
-# "policy_final_transcript", "hitpolicy_faca_transcript", "hitpc_transcript",
-# "HITPC_Transcript_Final_2014-09-03", "hitpc_draft_transcript", etc -- i.e.
-# full committee transcripts (naming shifted from "policy_..." to "hitpc_..."
-# around 2012-2013) -- but NOT "policy_mu_transcript", "hitpc_qum_transcript",
-# "hitpc_mu_sub3_transcript", "hitpc_muwg_sub2_transcript", etc, where a
-# workgroup code sits between "policy"/"hitpc" and "transcript", and NOT
-# "standards_transcript" (HIT Standards Committee, a sibling body).
+# Matches "standards_transcript", "standards_transcript_final",
+# "standards_final_transcript", "HITstandards_transcript", "hitsc_transcript",
+# "HITSC_Final_Transcript", "HITSC_Transcript_Draft_2015-03-18", etc -- i.e.
+# full committee transcripts (naming shifted from "standards_..." to
+# "hitsc_..." around 2011-2012) -- but NOT "standards_ps_transcript",
+# "standards_si_transcript", "hitsc_cqwg_transcript", etc, where a workgroup
+# code sits between "standards"/"hitsc" and "transcript".
+#
+# Applied to the BASENAME only: many of these live under portal paths that
+# themselves contain "standards", which would otherwise pull in every
+# workgroup file stored beside them.
 MAIN_COMMITTEE_TRANSCRIPT = re.compile(
-    r"(?:policy|hitpc)(?:[-_]?(?:committee|final|faca|draft))*[-_]?transcript"
+    r"(?:hit)?(?:standards|hitsc)(?:[-_]?(?:committee|final|faca|draft))*[-_]?transcript"
 )
 
 # Workgroup/subcommittee/hearing codes seen tacked on as a *suffix* right
-# after "transcript" (e.g. "hitpc_draft_transcript_mu.pdf" for the
-# Meaningful Use workgroup) -- MAIN_COMMITTEE_TRANSCRIPT alone doesn't catch
-# these since the code comes after, not between, "policy"/"hitpc" and
+# after "transcript" -- MAIN_COMMITTEE_TRANSCRIPT alone doesn't catch these
+# since the code comes after, not between, "standards"/"hitsc" and
 # "transcript".
 WORKGROUP_SUFFIX = re.compile(
-    r"transcript[-_](mu|qum|ie|ca|pg|sp|psp|ps|si|co|cq|vtf|erx|sig|pm|"
-    r"nwhin|nhin|ac|hie|tiger|hearing|session)\b"
+    r"transcript[-_](mu|qum|ie|ca|pg|sp|psp|ps|si|co|cq|ct|vtf|erx|sig|pm|"
+    r"nwhin|nhin|ac|hie|cpe|pghd|tiger|hearing|session)\b"
 )
 
 FILETYPES = (".pdf", ".txt", ".doc", ".docx")   # no .mp3: text transcripts only
@@ -84,7 +109,7 @@ def cdx_query(domain, ext):
     }
     for attempt in range(3):
         try:
-            r = requests.get(CDX, params=params, timeout=120)
+            r = requests.get(CDX, params=params, timeout=180)
             r.raise_for_status()
             rows = r.json()
             break
@@ -99,27 +124,40 @@ def cdx_query(domain, ext):
 
 def parse_meeting_date(url):
     """Best-effort extraction of the meeting date embedded in the filename
-    (e.g. "2012-02-01_policy_transcript_final.pdf" or
-    "20100113_policy_committee_transcript_draft.pdf"). Returns None if no
-    date could be parsed."""
+    (e.g. "2012-02-29_standards_transcript_final.pdf",
+    "20100120_standards_transcript_draft.pdf",
+    "HITSC_Transcript_Final_2014-02-18.pdf", or the 2009-era MMDDYY
+    "HITstandards_transcript_062309-1.pdf"). Returns None if no date could be
+    parsed -- "standards_transcript.pdf" carries none at all, and is dated
+    from the text inside it at build time."""
     base = url.split("/")[-1]
     m = re.search(r"(\d{4})[-_](\d{2})[-_](\d{2})", base)
     if not m:
         m = re.search(r"(?<!\d)(\d{4})(\d{2})(\d{2})(?!\d)", base)
-    if not m:
-        return None
-    try:
-        return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
-    except ValueError:
-        return None
+    if m:
+        try:
+            return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        except ValueError:
+            pass
+    # 2009-era MMDDYY: "..._062309-1.pdf" -> 2009-06-23
+    m = re.search(r"(?<!\d)(\d{2})(\d{2})(\d{2})(?!\d)", base)
+    if m:
+        mo, dy, yr = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if 1 <= mo <= 12 and 1 <= dy <= 31 and 9 <= yr <= 17:
+            try:
+                return date(2000 + yr, mo, dy)
+            except ValueError:
+                pass
+    return None
 
 def wanted(url, start=None, end=None):
     u = url.lower()
     if not u.endswith(FILETYPES):
         return False
-    if not MAIN_COMMITTEE_TRANSCRIPT.search(u):
+    base = u.split("/")[-1]
+    if not MAIN_COMMITTEE_TRANSCRIPT.search(base):
         return False
-    if WORKGROUP_SUFFIX.search(u.split("/")[-1]):
+    if WORKGROUP_SUFFIX.search(base):
         return False
     if start or end:
         d = parse_meeting_date(url)
@@ -179,12 +217,15 @@ def main(start=None, end=None):
 
     manifest = []
     for url, ts, _ in candidates:
-        raw = f"http://web.archive.org/web/{ts}id_/{url}"
+        # HTTPS, not HTTP: archive.org refuses port 80 once it decides you have
+        # been asking for a while, which shows up as a wave of ECONNREFUSED
+        # partway through an otherwise healthy run.
+        raw = f"https://web.archive.org/web/{ts}id_/{url}"
         out = os.path.join(OUTDIR, safe_name(url, ts))
         if os.path.exists(out):
             manifest.append([ts, url, out, os.path.getsize(out)])
             continue
-        for attempt in range(3):
+        for attempt in range(5):
             try:
                 resp = requests.get(raw, timeout=120)
                 if resp.status_code == 200 and resp.content:
@@ -192,12 +233,16 @@ def main(start=None, end=None):
                         f.write(resp.content)
                     manifest.append([ts, url, out, len(resp.content)])
                     print(f"  saved {out} ({len(resp.content)} bytes)", file=sys.stderr)
-                break
+                    break
+                if resp.status_code in (429, 503, 504):
+                    time.sleep(5 * (attempt + 1))
+                    continue
+                break                      # 404 etc: no point retrying
             except Exception as e:
-                if attempt == 2:
+                if attempt == 4:
                     print(f"  ! download failed {url}: {e}", file=sys.stderr)
                 else:
-                    time.sleep(2 * (attempt + 1))
+                    time.sleep(5 * (attempt + 1))   # exponential-ish backoff
         time.sleep(SLEEP)
 
     with open(os.path.join(OUTDIR, "manifest.csv"), "w", newline="") as f:

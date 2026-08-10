@@ -38,13 +38,18 @@ STANDALONE_DATE_RE = re.compile(
     r"|November|December) \d{1,2}, \d{4}$"
 )
 STANDALONE_TITLE_RE = re.compile(
-    r"^(HIT Policy Committee|Health IT Policy Committee|HIT Policy Committee, .*)$"
+    r"^(HIT Standards Committee|Health IT Standards Committee"
+    r"|HIT Standards Committee Meeting|HITSC)(,.*)?$"
 )
 
 # Not real speakers even though they match the name shape.
 HEADER_STOPLIST = {
     "public comment", "roll call", "agenda", "action item", "next steps",
     "altarum", "audio", "operator", "recording",
+    # Running page headers of the form "DRAFT Transcript – HIT Standards
+    # Committee Jan 20, 2010" parse as a dash header whose "name" is
+    # "DRAFT Transcript", inventing a speaker with thousands of words.
+    "draft", "final", "transcript", "draft transcript", "final transcript",
     # org-name fragments from wrapped lines, not people
     "healthcare", "technology", "foundation", "university", "corporation",
     "administration", "association", "committee", "moderator", "conclusion",

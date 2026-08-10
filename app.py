@@ -1,4 +1,4 @@
-"""HITPC Transcript Explorer — Streamlit app over hitpc.db.
+"""HITSC Transcript Explorer — Streamlit app over hitsc.db.
 
 Run:  .venv/bin/streamlit run app.py
 """
@@ -12,9 +12,9 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-DB = Path(__file__).parent / "hitpc.db"
+DB = Path(__file__).parent / "hitsc.db"
 
-st.set_page_config(page_title="HITPC Transcript Explorer", layout="wide")
+st.set_page_config(page_title="HITSC Transcript Explorer", layout="wide")
 
 TOPIC_LABELS = {
     "nhin": "NHIN / NwHIN",
@@ -23,13 +23,22 @@ TOPIC_LABELS = {
     "interoperability": "Interoperability",
     "meaningful_use": "Meaningful Use",
     "privacy_security": "Privacy & Security",
-    "certification": "Certification",
-    "patient_engagement": "Patient Engagement",
     "info_blocking": "Information Blocking",
-    "standards": "Standards",
+    "vocabulary": "Vocabularies & Code Sets",
+    "content_standards": "Content Standards (HL7 / CDA)",
+    "fhir_api": "FHIR & APIs",
+    "transport": "Transport & IHE Profiles",
+    "testing_certification": "Testing & Certification",
+    "standards_process": "Standards Process & SDOs",
+    "maturity_adoption": "Standards Maturity",
     "quality_measures": "Quality Measures",
-    "epic_mention": "Epic (mentions)",
-    "vendor_mention": "Other vendors (mentions)",
+    "patient_matching": "Patient Matching",
+    "provenance_segmentation": "Provenance & Segmentation",
+    "usability_safety": "Usability & Safety",
+    "patient_engagement": "Patient Engagement",
+    "eprescribing": "e-Prescribing",
+    "public_health": "Public Health Reporting",
+    "vendor_mention": "EHR vendors (mentions)",
 }
 
 # Org words too generic to use as a "mentioned by others" search term.
@@ -142,7 +151,7 @@ def show_utterances(df, page_size=25, key="utt", start_page=None):
 # ---------------------------------------------------------------------- pages
 
 def page_overview():
-    st.title("HIT Policy Committee — Transcript Explorer")
+    st.title("HIT Standards Committee — Transcript Explorer")
     st.caption(
         "75 full-committee meetings, May 2009 – November 2015, recovered from the "
         "Internet Archive after ONC retired the original pages.")
@@ -270,7 +279,7 @@ def page_speakers():
 
     st.divider()
     options = (lb["name"] + " — " + lb["org"]).tolist()
-    # ?speaker=<key> deep link, e.g. ?speaker=judith+faulkner
+    # ?speaker=<key> deep link, e.g. ?speaker=john+halamka
     want = (qp("speaker") or "").replace("+", " ").strip().lower()
     idx = next((i for i, k in enumerate(lb["id"])
                 if want and q("SELECT key FROM speakers WHERE id=?", (int(k),)).key[0] == want), 0)
@@ -435,7 +444,7 @@ def page_topics():
 
     focus = st.selectbox("Drill into topic", picks, format_func=lambda t: TOPIC_LABELS[t])
     if focus in ("nhin", "hie"):
-        arc = q("SELECT content FROM analysis_notes WHERE kind='nhin_arc' ORDER BY id DESC LIMIT 1")
+        arc = q("SELECT content FROM analysis_notes WHERE kind='standards_arc' ORDER BY id DESC LIMIT 1")
         if not arc.empty:
             with st.expander("How the NHIN/HIE debate evolved, 2009–2015", expanded=False):
                 st.markdown(arc.content[0])
@@ -517,10 +526,10 @@ def page_meetings():
     c1, c2, c3 = st.columns([1.2, 1.2, 2])
     c1.metric("Utterances", f"{int(row['n_utterances']):,}")
     c2.metric("Words", f"{int(row['n_words']):,}")
-    plain = f"HIT Policy Committee — {row['date']}\n\n" + "\n\n".join(
+    plain = f"HIT Standards Committee — {row['date']}\n\n" + "\n\n".join(
         f"{r['name']} ({r['org']}):\n{r['text']}" for _, r in utts.iterrows())
     c3.download_button("⬇ Download full transcript (.txt)", plain,
-                       file_name=f"hitpc_{row['date']}.txt", mime="text/plain")
+                       file_name=f"hitsc_{row['date']}.txt", mime="text/plain")
     if row["source_url"]:
         st.caption(f"Source: [original ONC file]({row['source_url']}) "
                    f"· archived copy: `{row['filename']}`")

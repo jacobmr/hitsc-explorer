@@ -1,4 +1,4 @@
-"""Build hitpc.db from the transcript corpus.
+"""Build hitsc.db from the transcript corpus.
 
 Steps: extract text -> pick one canonical file per meeting date (final beats
 draft, longer beats shorter) -> parse utterances -> normalize speakers ->
@@ -17,7 +17,7 @@ from .parse import parse_utterances
 from .speakers import SpeakerRegistry
 from .topics import tag
 
-DB_PATH = Path(__file__).resolve().parent.parent / "hitpc.db"
+DB_PATH = Path(__file__).resolve().parent.parent / "hitsc.db"
 
 SCHEMA = """
 DROP TABLE IF EXISTS meetings;
@@ -98,7 +98,7 @@ def pick_canonical(files):
 def source_urls():
     """local filename -> original ONC url, from the corpus download manifest."""
     import csv as _csv
-    path = Path(__file__).resolve().parent.parent / "hitpc_corpus" / "manifest.csv"
+    path = Path(__file__).resolve().parent.parent / "hitsc_corpus" / "manifest.csv"
     if not path.exists():
         return {}
     out = {}

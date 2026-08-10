@@ -1,10 +1,10 @@
 """Normalize raw speaker headers into canonical people and organizations.
 
 Raw headers vary per era and transcription vendor:
-    "Judy Faulkner – Epic Systems – Founder"
-    "Judy Faulkner, MS – Founder and Chief Executive Officer – EPIC Systems Corporation"
-    "Judy Faulkner, Epic"
-    "Judith Faulkner"
+    "John Halamka – Harvard Medical School – Chief Information Officer"
+    "John Halamka, MD, MS – CIO – Beth Israel Deaconess Medical Center"
+    "John Halamka, BIDMC"
+    "Dr. John Halamka"
 """
 
 import re
@@ -23,19 +23,38 @@ CREDENTIALS = {
 # Explicit person aliases: transcription typos and nickname variants that the
 # automatic (last name + first-name prefix) merge can't catch.
 NAME_ALIASES = {
-    "judy faulkner": "Judith Faulkner",
-    "david landsky": "David Lansky",
-    "devin mcgraw": "Deven McGraw",
-    "devon mcgraw": "Deven McGraw",
-    "christine beck": "Christine Bechtel",
-    "mark probst": "Marc Probst",
-    "micky tripathy": "Micky Tripathi",
-    "frank nemic": "Frank Nemec",
+    # Transcription spellings of HITSC regulars.
+    "john halumka": "John Halamka",
+    "john halamke": "John Halamka",
+    "dixie backer": "Dixie Baker",
+    # NB: alias values skip NICKNAMES expansion, so they must be given in the
+    # already-expanded form ("Wesley", not "Wes") or the alias and the plain
+    # spelling key to two different people.
+    "wes rischel": "Wesley Rishel",
+    "arian malec": "Arien Malec",
+    "aryan malec": "Arien Malec",
+    "orien malec": "Arien Malec",
+    "doug fridsman": "Douglas Fridsma",
+    "douglas fridsman": "Douglas Fridsma",
+    "david mccalley": "David McCallie",
+    "david mccallie jr": "David McCallie",
+    # Ross, Ferguson, Overhage, Elmore and Coleman each appear under two
+    # spellings in the corpus and would otherwise split into two people.
+    # ("Ron Ross" and "Clarke Ross" are different men and stay separate.)
+    "kris ross": "Cris Ross",
+    "chris ross": "Cris Ross",          # not the Christopher nickname
+    "christopher ross": "Cris Ross",
+    "becky kush": "Rebecca Kush",
+    "jamie ferguson": "James Ferguson",
+    "jaime ferguson": "James Ferguson",
+    "mark overhage": "Marc Overhage",
+    "j marc overhage": "Marc Overhage",
+    "johnathan coleman": "Jonathan Coleman",
     "farzad mostashari": "Farzad Mostashari",
     "fazad mostashari": "Farzad Mostashari",
-    "art davidson": "Arthur Davidson",
     "michelle consolazio nelson": "Michelle Consolazio",  # married name mid-tenure
-    "kenneth beutow": "Kenneth Buetow",
+    "terry cullen": "Theresa Cullen",
+    "andy wiesenthal": "Andrew Wiesenthal",
     "unidentified speaker": "(unidentified)",
     "unidentified male": "(unidentified)",
     "unidentified female": "(unidentified)",
@@ -50,12 +69,44 @@ NICKNAMES = {
     "beth": "elizabeth", "kathy": "katherine", "kate": "katherine",
     "deb": "deborah", "debbie": "deborah", "steve": "steven", "greg": "gregory",
     "doug": "douglas", "dan": "daniel", "matt": "matthew", "pat": "patricia",
+    "stan": "stanley", "wes": "wesley", "jamie": "james", "becky": "rebecca",
+    "andy": "andrew", "ken": "kenneth", "jon": "jonathan", "rich": "richard",
 }
 
 # Organization canonicalization: first regex that matches wins.
 ORG_RULES = [
     (re.compile(r"\bepic\b", re.I), "Epic"),
     (re.compile(r"\bcerner\b", re.I), "Cerner"),
+    # HITSC leadership and long-serving members.
+    (re.compile(r"beth israel|\bbidmc\b", re.I), "Beth Israel Deaconess"),
+    (re.compile(r"harvard", re.I), "Harvard"),
+    (re.compile(r"\bhca\b|hospital corporation of america", re.I), "HCA"),
+    (re.compile(r"\bsaic\b|science applications", re.I), "SAIC"),
+    (re.compile(r"martin,? blanck", re.I), "Martin, Blanck & Associates"),
+    (re.compile(r"\bgartner\b", re.I), "Gartner"),
+    (re.compile(r"relayhealth", re.I), "RelayHealth"),
+    (re.compile(r"\bmayo\b", re.I), "Mayo Clinic"),
+    (re.compile(r"regenstrief", re.I), "Regenstrief Institute"),
+    (re.compile(r"\bsiemens\b", re.I), "Siemens"),
+    (re.compile(r"\btenet\b", re.I), "Tenet Healthcare"),
+    (re.compile(r"blue ?cross|bcbs", re.I), "BlueCross BlueShield"),
+    (re.compile(r"surescripts", re.I), "Surescripts"),
+    (re.compile(r"deloitte", re.I), "Deloitte"),
+    (re.compile(r"genetic alliance", re.I), "Genetic Alliance"),
+    (re.compile(r"\bcdisc\b", re.I), "CDISC"),
+    (re.compile(r"aurora health", re.I), "Aurora Health Care"),
+    (re.compile(r"\bpremier\b", re.I), "Premier Inc."),
+    (re.compile(r"golden living", re.I), "Golden Living"),
+    (re.compile(r"\bhimss\b", re.I), "HIMSS"),
+    (re.compile(r"intelligent medical objects|\bimo\b", re.I),
+     "Intelligent Medical Objects"),
+    (re.compile(r"healthwise", re.I), "Healthwise"),
+    (re.compile(r"geisinger", re.I), "Geisinger"),
+    (re.compile(r"healthbridge", re.I), "HealthBridge"),
+    (re.compile(r"\bhl7\b|health level ?seven", re.I), "HL7"),
+    (re.compile(r"\bnist\b|national institute of standards", re.I), "NIST"),
+    (re.compile(r"\bdo[dD]\b|department of defense|military health", re.I), "DoD"),
+    (re.compile(r"indian health service|\bihs\b", re.I), "IHS"),
     # ONC appears under many labels: the office, its sub-offices, and the
     # National Coordinator post itself (Blumenthal/Mostashari/DeSalvo).
     (re.compile(r"office of the national coordinator|\bonc\b"
@@ -69,40 +120,33 @@ ORG_RULES = [
     (re.compile(r"veterans (affairs|administration)|\bva\b(?!\w)", re.I), "VA"),
     (re.compile(r"centers for disease|\bcdc\b", re.I), "CDC"),
     (re.compile(r"social security", re.I), "SSA"),
-    (re.compile(r"palo alto medical", re.I), "Palo Alto Medical Foundation"),
-    (re.compile(r"pacific business group", re.I), "Pacific Business Group on Health"),
     (re.compile(r"center for democracy", re.I), "Center for Democracy & Technology"),
     (re.compile(r"national partnership", re.I), "National Partnership for Women & Families"),
     (re.compile(r"intermountain", re.I), "Intermountain Healthcare"),
     (re.compile(r"kindred", re.I), "Kindred Healthcare"),
-    (re.compile(r"institute for family health", re.I), "Institute for Family Health"),
     (re.compile(r"brigham|partners healthcare", re.I), "Brigham & Women's / Partners"),
     (re.compile(r"massachusetts ehealth", re.I), "Massachusetts eHealth Collaborative"),
-    (re.compile(r"lance armstrong|fastercures", re.I), "FasterCures / Lance Armstrong Fdn"),
     (re.compile(r"markle", re.I), "Markle Foundation"),
-    (re.compile(r"manatt", re.I), "Manatt, Phelps & Phillips"),
     (re.compile(r"kaiser", re.I), "Kaiser Permanente"),
     (re.compile(r"aetna", re.I), "Aetna"),
     (re.compile(r"wellpoint", re.I), "WellPoint"),
-    (re.compile(r"intel", re.I), "Intel"),
+    (re.compile(r"intel\b", re.I), "Intel"),
     (re.compile(r"microsoft", re.I), "Microsoft"),
-    (re.compile(r"1199|seiu|service employees", re.I), "SEIU 1199"),
+    (re.compile(r"\boracle\b", re.I), "Oracle"),
+    (re.compile(r"\bibm\b", re.I), "IBM"),
     (re.compile(r"university of minnesota", re.I), "University of Minnesota"),
-    (re.compile(r"carnegie mellon", re.I), "Carnegie Mellon University"),
-    (re.compile(r"harvard", re.I), "Harvard"),
     (re.compile(r"johns hopkins|bloomberg school", re.I), "Johns Hopkins"),
     (re.compile(r"vanderbilt", re.I), "Vanderbilt"),
-    (re.compile(r"dartmouth", re.I), "Dartmouth"),
-    (re.compile(r"florida", re.I), "Florida State Legislature"),
-    (re.compile(r"denver (public )?health", re.I), "Denver Public Health"),
-    (re.compile(r"american enterprise", re.I), "American Enterprise Institute"),
-    (re.compile(r"american heart", re.I), "American Heart Association"),
-    (re.compile(r"lupus", re.I), "Lupus Foundation of America"),
+    (re.compile(r"\bmitre\b", re.I), "MITRE"),
+    (re.compile(r"american medical association|\bama\b", re.I),
+     "American Medical Association"),
+    (re.compile(r"american hospital association|\baha\b", re.I),
+     "American Hospital Association"),
     (re.compile(r"national cancer|\bnci\b", re.I), "NCI"),
+    (re.compile(r"national library of medicine|\bnlm\b", re.I),
+     "National Library of Medicine"),
     (re.compile(r"altarum", re.I), "Altarum"),
     (re.compile(r"national quality|\bnqf\b", re.I), "National Quality Forum"),
-    (re.compile(r"indiana university", re.I), "Indiana University CLEAR"),
-    (re.compile(r"cornerstone", re.I), "Cornerstone Health Care"),
 ]
 
 TITLE_WORDS = {

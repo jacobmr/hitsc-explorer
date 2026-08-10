@@ -1,8 +1,8 @@
 .venv/
 __pycache__/
 *.pyc
-hitpc_corpus/
+hitsc_corpus/
 corpus_text/
-hitpc_corpus_broad_archive/
+corpus_text_cache/
 .claude/
 .DS_Store

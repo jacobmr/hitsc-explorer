@@ -153,7 +153,7 @@ def show_utterances(df, page_size=25, key="utt", start_page=None):
 def page_overview():
     st.title("HIT Standards Committee — Transcript Explorer")
     st.caption(
-        "75 full-committee meetings, May 2009 – November 2015, recovered from the "
+        "68 full-committee meetings, May 2009 – December 2015, recovered from the "
         "Internet Archive after ONC retired the original pages.")
     m = q("SELECT * FROM meetings ORDER BY date")
     stats = q("""SELECT (SELECT COUNT(*) FROM meetings) meetings,
@@ -198,41 +198,49 @@ def page_overview():
     st.altair_chart(bar(top, col, "speaker"), width="stretch")
     st.caption(
         "**Word counts favour long presentations and whoever chairs the meeting.** "
-        "Switch to *number of times they spoke* for a different picture: Judy "
-        "Faulkner is 11th by words but 5th by interventions — she spoke up often, "
-        "in short bursts (64 words on average). Open **Speakers** for per-person "
+        "On this committee the two metrics largely agree — the top five are the "
+        "same people in the same order either way. What changes is the shape of "
+        "the talking: John Halamka leads both, but at 73 words per turn, the "
+        "lowest average in the top group, because chairing is mostly short "
+        "interjections. Walter Suarez has the longest average turn (166 words) "
+        "and ranks only 11th by total. Open **Speakers** for per-person "
         "analysis, quotes and topic mix.")
 
     with st.expander("How this corpus was built — and how the counts reconcile"):
         st.markdown(f"""
-**{q("SELECT COUNT(*) c FROM meetings").c[0]} meetings from 105 files.** The Wayback sweep recovered
-**105 transcript files**, but that is a file count, not a meeting count. ONC
-published most meetings twice (a *draft* and a *final* transcript), and the
-Internet Archive captured some documents at several different timestamps.
-Collapsing those leaves **75 unique meetings**: 26 dates had more than one
-file, accounting for the 30 extras. Where a draft and a final exist, the
-final is used.
+**{q("SELECT COUNT(*) c FROM meetings").c[0]} meetings from 96 documents.** The Wayback sweep recovered
+**96 distinct documents** — deduplicated by content digest, since the Archive
+stores the same file under many portal redirect URLs — but that is a document
+count, not a meeting count. ONC published most meetings twice, as a *draft*
+and then a *final* transcript. Collapsing those leaves **68 unique meetings**;
+the other 27 files are second versions of a meeting already counted. Where a
+draft and a final both exist, the final is used.
 
 **Dates come from the transcript, not the filename.** Every meeting date was
-checked against the date printed inside the document. 73 of 75 agreed; the two
-that did not were corrected:
+checked against the date printed inside the document. Here 67 of 68 filenames
+agreed. The exception carried no date at all:
 
-| Filename says | Transcript says | What happened |
+| Filename | Transcript says | What happened |
 |---|---|---|
-| 2009-05-27 | **2009-05-11** | Filename carried the publication date. This is the committee's first meeting. |
-| 2011-01-10 | **2012-01-10** | Mistyped by ONC. Robert Anthony's remarks in it recap "how we closed 2011". |
+| `standards_transcript.pdf` | **2009-05-15** | ONC's earliest posting had no date in its name. The text inside dates it to the committee's first meeting. |
 
-**Known gaps.** The corpus covers May 2009 – November 2015. Coverage is
-roughly monthly and thickest in 2010–2013; a handful of meetings announced in
-the *Federal Register* (e.g. 2009-12-15, 2010-05-19, 2010-09-28) have no
-surviving transcript at the URLs the Archive captured. Meetings per year:
-2009: 5 · 2010: 13 · 2011: 12 · 2012: 13 · 2013: 11 · 2014: 11 · 2015: 10.
+**Known gaps.** The corpus covers May 2009 – December 2015, roughly monthly.
+Meetings per year: 2009: 5 · 2010: 11 · 2011: 12 · 2012: 11 · 2013: 10 ·
+2014: 10 · 2015: 9. Twelve months in that span have no meeting here
+(2009-10 to 2009-12, 2010-07, 2012-12, 2013-05, 2013-10, 2014-01, 2014-10,
+2015-02, 2015-07, 2015-10) — some because the committee did not meet, some
+because no transcript survives at the URLs the Archive captured. These two
+causes are not distinguished.
+
+**Nothing after 2015.** HITSC ran on into 2016 — workgroup transcripts from
+that year survive — but no 2016 *full-committee* transcript appears anywhere
+in the Wayback index for either ONC domain. December 2015 is the end of the
+recoverable record, not the end of the committee.
 
 **Attendance is measured against tenure.** On a speaker's page, "meetings
 spoke at" is out of the meetings held between their first and last recorded
-remark — not out of all 75 — because most members served only part of the
-committee's life. Judy Faulkner, for instance, spoke at **52 of the 59**
-meetings held during her 2009–2014 tenure (88%), not 52 of 75.
+remark — not out of all 68 — because most members served only part of the
+committee's life.
 """)
 
 
@@ -240,7 +248,7 @@ def page_speakers():
     st.title("Speakers")
     st.caption(
         "Pick anyone to see their record: activity over time, topic mix, every "
-        "quote, how others referred to them, and — for 30 key figures — a "
+        "quote, how others referred to them, and — where one has been generated — a "
         "position analysis grounded in their own words.")
 
     years = q("SELECT DISTINCT substr(date,1,4) y FROM meetings ORDER BY y")["y"].tolist()
@@ -443,10 +451,12 @@ def page_topics():
             tooltip=["date:T", "topic", "n"]).properties(height=300), width="stretch")
 
     focus = st.selectbox("Drill into topic", picks, format_func=lambda t: TOPIC_LABELS[t])
-    if focus in ("nhin", "hie"):
+    # The narrative note is built from these four families (see
+    # pipeline.llm_pass.standards_arc), so offer it on exactly those.
+    if focus in ("content_standards", "vocabulary", "fhir_api", "standards_process"):
         arc = q("SELECT content FROM analysis_notes WHERE kind='standards_arc' ORDER BY id DESC LIMIT 1")
         if not arc.empty:
-            with st.expander("How the NHIN/HIE debate evolved, 2009–2015", expanded=False):
+            with st.expander("How the standards agenda evolved, 2009–2015", expanded=False):
                 st.markdown(arc.content[0])
 
     st.subheader(f"Top speakers on {TOPIC_LABELS[focus]}")
@@ -582,7 +592,7 @@ _default = ("Meetings & Transcripts" if qp("m") else
 choice = st.sidebar.radio("Page", _pages, index=_pages.index(_default))
 st.sidebar.divider()
 st.sidebar.caption(
-    "HIT Policy Committee transcripts 2009–2015, recovered from the Wayback "
+    "HIT Standards Committee transcripts 2009–2015, recovered from the Wayback "
     "Machine after ONC retired the original pages. Public U.S. government "
     "records (FACA proceedings).\n\n"
     "Position analyses are LLM-written from each speaker's own remarks; every "

@@ -429,7 +429,12 @@ def detail_speaker(sid):
 def page_topics():
     st.title("Topic Trends")
     picks = st.multiselect(
-        "Topics", list(TOPIC_LABELS), default=["nhin", "hie", "interoperability"],
+        # Defaults to this committee's own throughline — the consolidation onto
+        # C-CDA and the vocabulary triad, and FHIR arriving late — rather than
+        # the policy committee's NHIN/HIE story. These are also three of the
+        # four families the standards-arc note is built from, so it shows here.
+        "Topics", list(TOPIC_LABELS),
+        default=["content_standards", "vocabulary", "fhir_api"],
         format_func=lambda t: TOPIC_LABELS[t])
     if not picks:
         return

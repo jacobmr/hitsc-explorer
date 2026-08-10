@@ -71,9 +71,11 @@ REMARKS:
 {remarks}"""
 
 STANDARDS_ARC_PROMPT = """\
-Below are utterances from US HIT Standards Committee meetings (2009-2016) \
-tagged as being about content standards, vocabularies, FHIR/APIs, or \
-standards process, with speaker names and dates, in chronological order. \
+Below are utterances from US HIT Standards Committee meetings tagged as being \
+about content standards, vocabularies, FHIR/APIs, or standards process, with \
+speaker names and dates, in chronological order. The recoverable transcript \
+record runs May 2009 to December 2015; do not describe anything after it, and \
+do not imply the committee ended then. \
 Write a markdown narrative of how the committee's technical agenda evolved: \
 the early scramble to name standards for Meaningful Use Stage 1, the \
 consolidation onto C-CDA and the vocabulary triad (SNOMED/LOINC/RxNorm), the \
@@ -81,6 +83,9 @@ transport debates (NwHIN Exchange vs Direct), the arrival of FHIR and APIs \
 late in the committee's life, and the recurring argument about standards \
 maturity and how much to mandate. Name the main protagonists and what each \
 argued. Under 800 words.
+
+Refer to people by the speaker name given in the utterances below, and state \
+dates and statutory deadlines only where the transcripts support them.
 
 UTTERANCES:
 {utterances}"""
